@@ -19,7 +19,7 @@ class IREmissionModeler:
         path_to_astrodust_model (str): Path to the FITS file containing astrodust model data.
         path_to_dust_density_file (str): Path to the file containing dust density data.
         path_to_ir_data_dir (str): Path to the directory containing IR data.
-        path_to_binned_ir_data_dir (str): Path to the directory containing binned IR data.
+        path_to_binned_ir_data_dir (str): Path to the directory containing binned IR data. Filename must in format "88469_binned_ir_100.csv"
         path_to_col_density_file (str): Path to the file containing column density data.
 
     Methods:
@@ -69,12 +69,27 @@ class IREmissionModeler:
         This includes column density, astrodust model data, and stellar flux data.
         """
         # Loading the column density in the M8 sightline from file
+        self._load_column_density()
+
+        # Loading arrays from the Astrodust Model
+        self._load_astrodust_model()
+
+        # Loading HIP ID values of Stars in M8
+        self._load_star_flux_and_distance()
+
+        # Loading Observed IR Data
+        self._load_observed_ir_data()
+
+        # Loading Dust Density Data
+        self._load_dust_density_data()
+
+    def _load_column_density(self):
         with open(self.path_to_col_density_file) as f:
             col_density_data = yaml.load(f, Loader=yaml.FullLoader)
 
         self.column_density = col_density_data["N(HI + H2)"]
 
-        # Loading arrays from the Astrodust Model
+    def _load_astrodust_model(self):
         hdul = fits.open(path_to_astrodust_model)
         ir_wavelength = hdul[6].data
         self.ir_wave_near_100_microns = ir_wavelength[
@@ -85,7 +100,12 @@ class IREmissionModeler:
         log10_u = hdul[5].data
         hdul.close()
 
-        # Loading HIP ID values of Stars in M8
+        # Using instructions from Hensley and Draine 2022 (https://github.com/brandonshensley/Astrodust/blob/main/notebooks/model_file_tutorial.ipynb)
+        self.emission_spline = interpolate.RectBivariateSpline(
+            log10_u, ir_wavelength, emission[:, :, 2]
+        )
+
+    def _load_star_flux_and_distance(self):
         flux_data = pd.read_csv(self.path_to_stellar_model_flux)
 
         self.dstar = flux_data.loc[
@@ -97,6 +117,7 @@ class IREmissionModeler:
             .values[0]
         )
 
+    def _load_observed_ir_data(self):
         self.ir_obs_binned_data = pd.read_csv(
             os.path.join(
                 self.path_to_binned_ir_data_dir, f"{self.star_id}_binned_ir_100.csv"
@@ -106,13 +127,9 @@ class IREmissionModeler:
         self.ir_obs_angles = self.ir_obs_binned_data.loc[:, "Angle"]
         self.observed_ir100 = self.ir_obs_binned_data.loc[:, "IR100"]
 
+    def _load_dust_density_data(self):
         self.dust_density = np.loadtxt(self.path_to_dust_density_file)
         self.dust = self.dust_density.transpose()[1]
-
-        # Using instructions from Hensley and Draine 2022 (https://github.com/brandonshensley/Astrodust/blob/main/notebooks/model_file_tutorial.ipynb)
-        self.emission_spline = interpolate.RectBivariateSpline(
-            log10_u, ir_wavelength, emission[:, :, 2]
-        )
 
     def single_scatter(
         self,
@@ -256,7 +273,7 @@ class IREmissionModeler:
         ----
         OptimizeResult: The result of the optimization process.
         """
-        result = minimize(
+        self.result = minimize(
             self.fit,
             self.params,
             args=(self.sflux, self.dstar),
@@ -265,21 +282,83 @@ class IREmissionModeler:
             bounds=[[0, 1], [0, 0.999]],
             options={"disp": True, "maxiter": 100},
         )
-        return result
 
-    def plot_results(self):
+    def plot_results(
+        self,
+        figsize=(10, 6),
+        colors=("blue", "orange"),
+        markerstyles=("o", "s"),
+        grid=True,
+        title=None,
+        xlabel="Angle (Deg)",
+        ylabel="IR Emission (MJy sr-1)",
+        legend_loc="best",
+        legend_title=None,
+        save_filename=None,
+    ):
         """
         Generates and displays a plot comparing the modeled IR emission to observed data.
+
+        Parameters:
+        ----
+        figsize (tuple): Figure dimension (width, height) in inches.
+        colors (tuple): Colors for model and observed data points.
+        markerstyles (tuple): Marker styles for model and observed data points.
+        grid (bool): Whether to display a grid.
+        title (str): Title of the plot.
+        xlabel (str): Label for the x-axis.
+        ylabel (str): Label for the y-axis.
+        legend_loc (str): Location of the legend.
+        legend_title (str): Title for the legend.
+        save_filename (str): If provided, save the plot to this file.
         """
         import matplotlib.pyplot as plt
 
-        plt.scatter(self.ir_obs_angles, self.model_irem, s=5, label="Model IR")
-        plt.scatter(self.ir_obs_angles, self.observed_ir100, s=5, label="Observed IR")
-        plt.title(f"IR Emission Modeling - HIP {self.star_id}")
-        plt.legend()
-        plt.xlabel("Angles (Deg)")
-        plt.ylabel("IR Emission (MJy sr-1)")
-        plt.show()
+        plt.figure(figsize=figsize)
+        plt.scatter(
+            self.ir_obs_angles,
+            self.model_irem,
+            s=5,
+            c=colors[0],
+            marker=markerstyles[0],
+            label="Model IR",
+        )
+        plt.scatter(
+            self.ir_obs_angles,
+            self.observed_ir100,
+            s=5,
+            c=colors[1],
+            marker=markerstyles[1],
+            label="Observed IR",
+        )
+
+        if title:
+            plt.title(title)
+        else:
+            plt.title(f"IR Emission Modeling - HIP {self.star_id}")
+
+        if grid:
+            plt.grid(True)
+
+        if legend_title:
+            plt.legend(title=legend_title, loc=legend_loc)
+        else:
+            plt.legend(loc=legend_loc)
+
+        if xlabel:
+            plt.xlabel(xlabel)
+        else:
+            plt.xlabel("Angles (Deg)")
+
+        if ylabel:
+            plt.ylabel(ylabel)
+        else:
+            plt.ylabel("IR Emission (MJy sr-1)")
+
+        if save_filename:
+            plt.savefig(save_filename)
+        else:
+            plt.show()
 
     def callback(self, intermediate_result):
         """
@@ -327,7 +406,8 @@ if __name__ == "__main__":
         path_to_col_density_file,
     )
 
-    result = modeler.optimize("L-BFGS-B")
+    modeler.optimize("L-BFGS-B")
+    result = modeler.result
     modeler.plot_results()
 
     print(f"Optimized a = {result.x[0]}")
