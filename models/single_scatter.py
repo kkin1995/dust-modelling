@@ -152,8 +152,11 @@ class SingleScatteringSimulation:
             / (1 + (phase**2) - (2 * phase * np.cos(dangle))) ** (3 / 2)
         )
 
-        flux = sflux / 4.0 / np.pi / dist**2 * dust * sigma * sca * delta_dist
+        dist *= 3.08e18
 
+        flux = (sflux / (4.0 * np.pi * dist**2)) * sca
+
+        delta_dist *= 3.08e18
         nflux = len(flux)
         for i in range(nflux):
             flux[i] = flux[i] * np.exp(-sigma * np.sum(dust[0:i]) * delta_dist)
