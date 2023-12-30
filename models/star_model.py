@@ -1,4 +1,4 @@
-from io.read_castelli import ReadCastelli
+from dust_modeling_package.io.read_castelli import ReadCastelli
 import numpy as np
 import pandas as pd
 import os
@@ -191,18 +191,20 @@ if __name__ == "__main__":
     path_to_spectral_type_dict = os.path.join(
         DATA, "raw/spectral_type_temperature.yaml"
     )
+
     df = pd.read_csv(
-        "/Users/karankinariwala/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/raw/spica_hipparcos_data.csv"
+        "/Users/karankinariwala/Library/CloudStorage/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/raw/m8_stellar_data_gaia_hipparcos.csv"
     )
-    df.loc[:, DISTANCE_COLUMN] = 1 / (df.loc[:, "parallax(mas)"] * 1e-3)
+    df.loc[:, DISTANCE_COLUMN] = 1 / (df.loc[:, "parallax"] * 1e-3)
     star = df.loc[0, "hip_id"]
+
     df.to_csv(
-        "/Users/karankinariwala/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/raw/spica_hipparcos_data_with_distance.csv"
+        "/Users/karankinariwala/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/raw/m8_hipparcos_data_with_distance.csv"
     )
 
-    path_to_star_data = "/Users/karankinariwala/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/raw/spica_hipparcos_data_with_distance.csv"
+    path_to_star_data = "/Users/karankinariwala/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/raw/m8_hipparcos_data_with_distance.csv"
     wave = np.linspace(1000, 11000, num=10000)
-    extract_at_wavelength = [1100, 1368, 1500, 2300]
+    extract_at_wavelength = [1100, 1500, 2300]
 
     star_model_object = StarModel(path_to_spectral_type_dict, path_ck_data_dir, wave)
     flux_df = star_model_object.extract_flux_data(
@@ -210,4 +212,4 @@ if __name__ == "__main__":
         extract_at_wavelength,
         verbose=True,
     )
-    flux_df.to_csv(os.path.join(DATA, "processed", f"flux_data_{star}.csv"))
+    flux_df.to_csv(os.path.join(DATA, "processed", "flux_data_m8.csv"))

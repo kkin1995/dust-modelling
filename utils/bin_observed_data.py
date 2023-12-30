@@ -20,6 +20,12 @@ def bin_data(
     np.array: An array of the mean y values for each bin.
     """
     df = pd.read_csv(data_file)
+
+    df.drop(df.loc[df["NUV"] == -9999].index, inplace=True)
+    df.drop(df.loc[df["NUV_STD"] == 1000000].index, inplace=True)
+    # df.drop(df.loc[df["FUV"] == -9999].index, inplace=True)
+    # df.drop(df.loc[df["FUV_STD"] == 1000000].index, inplace=True)
+
     df.sort_values(by=x_data_name, axis=0, inplace=True)
 
     x_data = df.loc[:, x_data_name].values
@@ -63,20 +69,23 @@ if __name__ == "__main__":
     DATA = os.environ.get("DATA")
 
     ir_observed_data_dir = os.path.join(DATA, "raw", "ir_data", "extracted_data")
+    uv_observed_data_dir = "/Users/karankinariwala/Library/CloudStorage/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/observed-uv-data/data/extracted_data/fov_6_degrees/with_angle/"
     flux_data = os.path.join(DATA, "processed", "flux_data.csv")
     star_ids = pd.read_csv(flux_data).loc[:, "Star"].values
 
-    bin_size = 0.06
+    bin_size = 0.03
 
     for star_id in star_ids:
-        print(f"Star ID: {star_id}")
-        filename = os.path.join(ir_observed_data_dir, f"{star_id}_ir_100.csv")
+        # filename = os.path.join(ir_observed_data_dir, f"{star_id}_ir_100.csv")
+        filename = os.path.join(uv_observed_data_dir, f"{star_id}.csv")
+        print(f"File: {filename}")
 
         try:
-            binned_angles, binned_flux = bin_data(filename, bin_size, "Angle", "IR100")
+            binned_angles, binned_flux = bin_data(filename, bin_size, "Angle", "NUV")
         except Exception as e:
             print(e)
             continue
 
-        df = pd.DataFrame(data={"Angle": binned_angles, "IR100": binned_flux})
-        df.to_csv(os.path.join(DATA, "derived", f"{star_id}_binned_ir_100.csv"))
+        df = pd.DataFrame(data={"Angle": binned_angles, "NUV": binned_flux})
+        df.to_csv(os.path.join(DATA, "derived", f"{star_id}_binned_nuv.csv"))
+        # df.to_csv(os.path.join(DATA, "derived", f"{star_id}_binned_ir_100.csv"))

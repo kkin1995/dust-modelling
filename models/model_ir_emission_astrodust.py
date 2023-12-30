@@ -90,7 +90,7 @@ class IREmissionModeler:
         self.column_density = col_density_data["N(HI + H2)"]
 
     def _load_astrodust_model(self):
-        hdul = fits.open(path_to_astrodust_model)
+        hdul = fits.open(self.path_to_astrodust_model)
         ir_wavelength = hdul[6].data
         self.ir_wave_near_100_microns = ir_wavelength[
             np.argmin(np.abs(ir_wavelength - 100))
@@ -261,7 +261,7 @@ class IREmissionModeler:
 
         return chisq
 
-    def optimize(self, optimizer):
+    def optimize(self, optimizer, options={"disp": True, "maxiter": 100}):
         """
         Runs the optimization process to determine the best model parameters.
 
@@ -280,11 +280,12 @@ class IREmissionModeler:
             method=optimizer,
             callback=self.callback,
             bounds=[[0, 1], [0, 0.999]],
-            options={"disp": True, "maxiter": 100},
+            options=options,
         )
 
     def plot_results(
         self,
+        params,
         figsize=(10, 6),
         colors=("blue", "orange"),
         markerstyles=("o", "s"),
@@ -335,7 +336,9 @@ class IREmissionModeler:
         if title:
             plt.title(title)
         else:
-            plt.title(f"IR Emission Modeling - HIP {self.star_id}")
+            plt.title(
+                f"IR Emission Modeling - HIP {self.star_id} | a = {params[0]:.2f} | g = {params[1]:.2f}"
+            )
 
         if grid:
             plt.grid(True)
@@ -380,8 +383,9 @@ if __name__ == "__main__":
     load_dotenv()
     DATA = os.environ.get("DATA")
 
-    STAR = 88496
-    params = [0.8, 0.4]
+    stars = [88469, 88496, 88506, 88380, 88581, 88560, 88256, 88142, 88705, 88463]
+
+    params = [0.4, 0.3]
 
     path_to_stellar_model_flux = os.path.join(DATA, "processed", "flux_data.csv")
     path_to_astrodust_model = os.path.join(
@@ -395,20 +399,29 @@ if __name__ == "__main__":
 
     path_to_col_density_file = os.path.join(DATA, "processed", "m8_col_density.yaml")
 
-    modeler = IREmissionModeler(
-        STAR,
-        params,
-        path_to_stellar_model_flux,
-        path_to_astrodust_model,
-        path_to_dust_density_file,
-        path_to_ir_data_dir,
-        path_to_binned_ir_data_dir,
-        path_to_col_density_file,
-    )
+    options = {"disp": False, "maxiter": 100}
 
-    modeler.optimize("L-BFGS-B")
-    result = modeler.result
-    modeler.plot_results()
+    for star in stars:
+        print(f"Star: {star}")
+        modeler = IREmissionModeler(
+            star,
+            params,
+            path_to_stellar_model_flux,
+            path_to_astrodust_model,
+            path_to_dust_density_file,
+            path_to_ir_data_dir,
+            path_to_binned_ir_data_dir,
+            path_to_col_density_file,
+        )
 
-    print(f"Optimized a = {result.x[0]}")
-    print(f"Optimized g = {result.x[1]}")
+        modeler.optimize("L-BFGS-B", options=options)
+        result = modeler.result
+        modeler.plot_results(
+            result.x,
+            save_filename=os.path.join(
+                DATA, "processed", f"{star}_model_observed_ir_emission.png"
+            ),
+        )
+
+        print(f"Optimized a = {result.x[0]}")
+        print(f"Optimized g = {result.x[1]}")

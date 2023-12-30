@@ -11,11 +11,11 @@ df = pd.read_csv(data_path + "{}.csv".format(STAR))
 
 glon = df["GLON"].values
 glat = df["GLAT"].values
-gcs = SkyCoord(glon, glat, unit = u.deg, frame = 'galactic')
+gcs = SkyCoord(glon, glat, unit=u.deg, frame="galactic")
 
 
-plt.subplot(111, projection = 'aitoff')
+plt.subplot(111, projection="aitoff")
 plt.grid(True)
-plt.scatter(gcs.l.wrap_at('180d').radian, gcs.b.radian)
+plt.scatter(gcs.l.wrap_at("180d").radian, gcs.b.radian)
 
 plt.show()
