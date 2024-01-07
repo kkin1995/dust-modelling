@@ -3,7 +3,11 @@ import numpy as np
 
 
 def bin_data(
-    data_file: str, bin_size: float, x_data_name: str, y_data_name: str
+    data_file: str,
+    bin_size: float,
+    x_data_name: str,
+    y_data_name: str,
+    uv_or_ir="ir",
 ) -> tuple[np.array, np.array]:
     """
     This function reads data from a CSV file and sorts it based on a given column name. It then bins the data
@@ -21,10 +25,11 @@ def bin_data(
     """
     df = pd.read_csv(data_file)
 
-    df.drop(df.loc[df["NUV"] == -9999].index, inplace=True)
-    df.drop(df.loc[df["NUV_STD"] == 1000000].index, inplace=True)
-    # df.drop(df.loc[df["FUV"] == -9999].index, inplace=True)
-    # df.drop(df.loc[df["FUV_STD"] == 1000000].index, inplace=True)
+    if uv_or_ir == "uv":
+        df.drop(df.loc[df["NUV"] == -9999].index, inplace=True)
+        df.drop(df.loc[df["NUV_STD"] == 1000000].index, inplace=True)
+        # df.drop(df.loc[df["FUV"] == -9999].index, inplace=True)
+        # df.drop(df.loc[df["FUV_STD"] == 1000000].index, inplace=True)
 
     df.sort_values(by=x_data_name, axis=0, inplace=True)
 
@@ -68,24 +73,31 @@ if __name__ == "__main__":
     load_dotenv()
     DATA = os.environ.get("DATA")
 
-    ir_observed_data_dir = os.path.join(DATA, "raw", "ir_data", "extracted_data")
-    uv_observed_data_dir = "/Users/karankinariwala/Library/CloudStorage/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/observed-uv-data/data/extracted_data/fov_6_degrees/with_angle/"
-    flux_data = os.path.join(DATA, "processed", "flux_data.csv")
+    ir_observed_data_dir = os.path.join(
+        DATA, "extracted_data_hlsp_files/csv/fov_6_degrees/with_angle/"
+    )
+    flux_data = os.path.join(DATA, "flux_data_m8.csv")
     star_ids = pd.read_csv(flux_data).loc[:, "Star"].values
 
     bin_size = 0.03
 
     for star_id in star_ids:
-        # filename = os.path.join(ir_observed_data_dir, f"{star_id}_ir_100.csv")
-        filename = os.path.join(uv_observed_data_dir, f"{star_id}.csv")
+        filename = os.path.join(ir_observed_data_dir, f"{star_id}.csv")
         print(f"File: {filename}")
 
         try:
-            binned_angles, binned_flux = bin_data(filename, bin_size, "Angle", "NUV")
+            binned_angles, binned_flux = bin_data(filename, bin_size, "Angle", "IR100")
         except Exception as e:
             print(e)
             continue
 
-        df = pd.DataFrame(data={"Angle": binned_angles, "NUV": binned_flux})
-        df.to_csv(os.path.join(DATA, "derived", f"{star_id}_binned_nuv.csv"))
-        # df.to_csv(os.path.join(DATA, "derived", f"{star_id}_binned_ir_100.csv"))
+        df = pd.DataFrame(data={"Angle": binned_angles, "IR100": binned_flux})
+        df.to_csv(
+            os.path.join(
+                DATA,
+                os.path.join(
+                    "extracted_data_hlsp_files/csv/fov_6_degrees/binned_ir_data",
+                    f"{star_id}_binned_ir.csv",
+                ),
+            )
+        )

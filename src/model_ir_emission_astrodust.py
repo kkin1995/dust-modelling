@@ -120,7 +120,7 @@ class IREmissionModeler:
     def _load_observed_ir_data(self):
         self.ir_obs_binned_data = pd.read_csv(
             os.path.join(
-                self.path_to_binned_ir_data_dir, f"{self.star_id}_binned_ir_100.csv"
+                self.path_to_binned_ir_data_dir, f"{self.star_id}_binned_ir.csv"
             )
         )
 
@@ -371,9 +371,10 @@ class IREmissionModeler:
         ----
         intermediate_result: The current result of the optimization process.
         """
-        chisq = self.fit(intermediate_result, self.sflux, self.dstar)
+
+        chisq = self.fit(intermediate_result.x, self.sflux, self.dstar)
         print(
-            f"a = {intermediate_result[0]} | g = {intermediate_result[1]} | Chi Square = {chisq}"
+            f"a = {intermediate_result.x[0]} | g = {intermediate_result.x[1]} | Chi Square = {chisq}"
         )
 
 
@@ -385,21 +386,21 @@ if __name__ == "__main__":
 
     stars = [88469, 88496, 88506, 88380, 88581, 88560, 88256, 88142, 88705, 88463]
 
-    params = [0.4, 0.3]
+    params = [0.3, 0.8]
 
-    path_to_stellar_model_flux = os.path.join(DATA, "processed", "flux_data.csv")
-    path_to_astrodust_model = os.path.join(
-        DATA, "raw", "ir_data", "astrodust+PAH_MW_RV3.1.fits"
+    path_to_stellar_model_flux = os.path.join(DATA, "flux_data_m8.csv")
+    path_to_astrodust_model = os.path.join(DATA, "astrodust+PAH_MW_RV3.1.fits")
+    path_to_dust_density_file = os.path.join(DATA, "green-dust-density-2000pc.txt")
+    path_to_ir_data_dir = os.path.join(
+        DATA, "extracted_data_hlsp_files/csv/fov_6_degrees/with_angle"
     )
-    path_to_dust_density_file = os.path.join(
-        DATA, "processed", "green-dust-density-2000pc.txt"
+    path_to_binned_ir_data_dir = os.path.join(
+        DATA, "extracted_data_hlsp_files/csv/fov_6_degrees/binned_ir_data"
     )
-    path_to_ir_data_dir = os.path.join(DATA, "raw", "ir_data", "extracted_data")
-    path_to_binned_ir_data_dir = os.path.join(DATA, "derived")
 
-    path_to_col_density_file = os.path.join(DATA, "processed", "m8_col_density.yaml")
+    path_to_col_density_file = os.path.join(DATA, "m8_col_density.yaml")
 
-    options = {"disp": False, "maxiter": 100}
+    options = {"disp": True, "maxiter": 1000}
 
     for star in stars:
         print(f"Star: {star}")
@@ -414,12 +415,14 @@ if __name__ == "__main__":
             path_to_col_density_file,
         )
 
-        modeler.optimize("L-BFGS-B", options=options)
+        modeler.optimize("Nelder-Mead", options=options)
         result = modeler.result
         modeler.plot_results(
             result.x,
             save_filename=os.path.join(
-                DATA, "processed", f"{star}_model_observed_ir_emission.png"
+                DATA,
+                "model_observed_ir_plots",
+                f"{star}_model_observed_ir_emission.png",
             ),
         )
 

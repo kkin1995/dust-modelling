@@ -202,6 +202,7 @@ class SingleScatteringSimulation:
 
             if self.verbose:
                 print(f"Size of Flux: {self.flux.shape}")
+
             np.save(
                 os.path.join(
                     self.path_to_save_scattered_flux_array_file, f"{star}.npy"
@@ -216,13 +217,9 @@ if __name__ == "__main__":
     load_dotenv()
     DATA = os.environ.get("DATA")
 
-    path_to_flux_data_file = os.path.join(DATA, "processed", "flux_data.csv")
-    path_to_dust_density_file = os.path.join(
-        DATA, "processed", "green-dust-density-2000pc.txt"
-    )
-    path_to_save_scattered_flux_array_file = (
-        os.path.join(DATA, "processed", "single_scatter_model"),
-    )
+    path_to_flux_data_file = os.path.join(DATA, "flux_data_m8.csv")
+    path_to_dust_density_file = os.path.join(DATA, "green-dust-density-2000pc.txt")
+    path_to_save_scattered_flux_array_file = os.path.join(DATA, "single_scatter_model")
     wavelengths = [1100, 1500, 2300]
     sigma_at_wavelength = np.array([1.840, 1.275, 1.439])  # Extinction Cross Section
     sigma_at_wavelength *= 1e-21

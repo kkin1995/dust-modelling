@@ -71,3 +71,18 @@ def convert_ebv_to_density(
 
     if plot:
         plot_density(distance, total_number_density_hydrogen)
+
+
+if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    DATA = os.environ.get("DATA")
+
+    convert_ebv_to_density(
+        os.path.join(DATA, "green-dust-ebv-2000pc.txt"),
+        os.path.join(DATA, "green-dust-density-2000pc.txt"),
+        save=True,
+        plot=True,
+    )

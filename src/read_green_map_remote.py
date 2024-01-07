@@ -16,7 +16,7 @@ def query_green_dust_map(
     plot: bool = False,
     save: bool = True,
     output_path: str = None,
-) -> tuple:
+):
     """
     Queries the 3D dust map from Green et al 2019 using the dustmaps package.
 
@@ -59,3 +59,12 @@ def query_green_dust_map(
             f.write(str(round(d[i], 4)) + " " + str(round(reddening[i], 4)) + "\n")
 
         f.close()
+
+
+if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    DATA = os.environ.get("DATA")
+    query_green_dust_map(5.9575, -1.1667, 2000, output_path=DATA)

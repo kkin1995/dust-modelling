@@ -1,11 +1,6 @@
-from dust_modeling_package.io.read_castelli import ReadCastelli
+from read_castelli import ReadCastelli
 import numpy as np
 import pandas as pd
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-DATA = os.environ.get("DATA")
 
 
 class StarModel:
@@ -185,24 +180,24 @@ class StarModel:
 
 
 if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    DATA = os.environ.get("DATA")
+
     # To Avoid Duplication
     DISTANCE_COLUMN = "Distance(pc)"
-    path_ck_data_dir = "/Users/karankinariwala/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/raw/castelli-kurucz-models/ckp00/"
-    path_to_spectral_type_dict = os.path.join(
-        DATA, "raw/spectral_type_temperature.yaml"
-    )
+    path_ck_data_dir = os.path.join(DATA, "castelli-kurucz-models/ckp00/")
+    path_to_spectral_type_dict = os.path.join(DATA, "spectral_type_temperature.yaml")
 
-    df = pd.read_csv(
-        "/Users/karankinariwala/Library/CloudStorage/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/raw/m8_stellar_data_gaia_hipparcos.csv"
-    )
+    df = pd.read_csv(os.path.join(DATA, "m8_stellar_data_gaia_hipparcos.csv"))
     df.loc[:, DISTANCE_COLUMN] = 1 / (df.loc[:, "parallax"] * 1e-3)
     star = df.loc[0, "hip_id"]
 
-    df.to_csv(
-        "/Users/karankinariwala/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/raw/m8_hipparcos_data_with_distance.csv"
-    )
+    df.to_csv(os.path.join(DATA, "m8_hipparcos_data_with_distance.csv"))
 
-    path_to_star_data = "/Users/karankinariwala/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/raw/m8_hipparcos_data_with_distance.csv"
+    path_to_star_data = os.path.join(DATA, "m8_hipparcos_data_with_distance.csv")
     wave = np.linspace(1000, 11000, num=10000)
     extract_at_wavelength = [1100, 1500, 2300]
 
@@ -212,4 +207,4 @@ if __name__ == "__main__":
         extract_at_wavelength,
         verbose=True,
     )
-    flux_df.to_csv(os.path.join(DATA, "processed", "flux_data_m8.csv"))
+    flux_df.to_csv(os.path.join(DATA, "flux_data_m8.csv"))

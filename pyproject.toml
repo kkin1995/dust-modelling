@@ -1,20 +1,20 @@
 [tool.poetry]
 name = "dust-modeling"
-version = "0.0.1"
-description = "A Python package to help Astrophysicists model interstellar and cosmic dust."
-authors = ["Karan Kinariwala"]
-license = "MIT"
+version = "0.1.0"
+description = ""
+authors = ["kkin1995"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.13"
-numpy = "^1.26.0"
-pandas = "^2.1.1"
-astropy = "^5.3.4"
-dustmaps = "^1.0.12"
-pyyaml = "^6.0.1"
-matplotlib = "^3.8.0"
+python = "^3.11"
+numpy = "^1.26.3"
+pandas = "^2.1.4"
+matplotlib = "^3.8.2"
+astropy = "^6.0.0"
 python-dotenv = "^1.0.0"
+scipy = "^1.11.4"
+pyyaml = "^6.0.1"
+dustmaps = "^1.0.12"
 
 
 [build-system]

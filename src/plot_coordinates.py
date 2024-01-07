@@ -8,7 +8,7 @@ parser.add_argument("--fuv", action="store_true")
 args = parser.parse_args()
 
 data_dir = "/Users/karankinariwala/Library/CloudStorage/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/observed-uv-data/data/extracted_data/fov_6_degrees/"
-coord_plot_dir = "/Users/karankinariwala/Library/CloudStorage/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/processed/"
+coord_plot_dir = "/Users/karankinariwala/Library/CloudStorage/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/m8-dust-modeling/data/processed/coordinate_plots/"
 
 star_list = [88463, 88705, 88506, 88560, 88581, 88380, 88142, 88469, 88496, 88256]
 
@@ -27,10 +27,12 @@ for star in star_list:
     glon = df["GLON"].values
     glat = df["GLAT"].values
     glon[glon > 180] -= 360
+
     fig, ax = plt.subplots()
+    plt.grid(True)
     ax.scatter(glon, glat, s=0.05)
-    ax.set_xlabel("Galactic Longitude")
-    ax.set_ylabel("Galactic Latitude")
+    ax.set_xlabel("Galactic Longitude (deg)")
+    ax.set_ylabel("Galactic Latitude (deg)")
     ticks = ax.get_xticks()
     ticks[ticks < 0] += 360
     ax.set_xticks(ax.get_xticks().tolist())

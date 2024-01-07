@@ -47,5 +47,5 @@ if __name__ == "__main__":
 
     col_density = get_col_density_from_dustmap("SFD", gal_coord)
 
-    with open(os.path.join(DATA, "processed", "m8_col_density.yaml"), "w") as f:
+    with open(os.path.join(DATA, "m8_col_density.yaml"), "w") as f:
         f.write(f"N(HI + H2): {col_density}")
