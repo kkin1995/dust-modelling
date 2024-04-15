@@ -1,6 +1,7 @@
 from read_castelli import ReadCastelli
 import numpy as np
 import pandas as pd
+import os
 
 
 class StarModel:
@@ -32,6 +33,7 @@ class StarModel:
         self,
         path_to_star_data: str,
         extract_at_wavelength: list | float,
+        save_spectrum: str = None,
         verbose: bool = False,
     ) -> pd.DataFrame:
         """Extracts flux from Castelli - Kurucz Model using star data.
@@ -97,8 +99,8 @@ class StarModel:
 
             _, sflux = self.castelli_reader_object.find_ck_model(spectral_type)
 
-            b_index = self.find_wavelength_index(4400.0, wave)
-            v_index = self.find_wavelength_index(5500.0, wave)
+            b_index = self.find_wavelength_index(4400.0, self.wave)
+            v_index = self.find_wavelength_index(5500.0, self.wave)
             bflux = sflux[b_index]
             vflux = sflux[v_index]
 
@@ -111,7 +113,7 @@ class StarModel:
                 ebv = 0.0
 
             # Converting Castelli Units to Physical Flux Units (ergs cm-2 s-1 A-1)
-            scale = np.multiply(3.336e-19, np.divide(np.power(wave, 2), 4 * np.pi))
+            scale = np.multiply(3.336e-19, np.divide(np.power(self.wave, 2), 4 * np.pi))
 
             # The following code scales the flux by the magnitude of the star.
             # Currently disabled as it may require further validation or modification.
@@ -123,20 +125,23 @@ class StarModel:
             sflux *= scale
 
             wavelength_indices = self.extract_wavelength_indices(
-                extract_at_wavelength, wave
+                extract_at_wavelength, self.wave
             )
 
             if verbose:
                 for idx in wavelength_indices:
-                    print(f"--Flux at {round(wave[idx])} A: {sflux[idx]}")
+                    print(f"--Flux at {round(self.wave[idx])} A: {sflux[idx]}")
 
             flux["Star"] = star_data.loc[i, "hip_id"]
             for idx in wavelength_indices:
-                flux[f"Flux{round(wave[idx])}"] = sflux[idx]
+                flux[f"Flux{round(self.wave[idx])}"] = sflux[idx]
             flux["EBV"] = ebv
             flux[self.DISTANCE_COLUMN] = star_data.loc[i, self.DISTANCE_COLUMN]
 
             flux_data.append(flux)
+
+            if save_spectrum != None:
+                np.save(os.path.join(save_spectrum, f"{star}.npy"), sflux)
 
         return pd.DataFrame(flux_data)
 
@@ -205,6 +210,7 @@ if __name__ == "__main__":
     flux_df = star_model_object.extract_flux_data(
         path_to_star_data,
         extract_at_wavelength,
+        save_spectrum=os.path.join(DATA, "castelli-kurucz-models"),
         verbose=True,
     )
     flux_df.to_csv(os.path.join(DATA, "flux_data_m8.csv"))

@@ -1,18 +1,31 @@
 import numpy as np
 import pandas as pd
 import os
+from utils import setup_logger
+
+logger = setup_logger(__name__)
 
 
-def compute_angle_between_star_and_point(star_glon, star_glat, df_glon, df_glat):
+def compute_angle_between_star_and_point(
+    star_glon: float,
+    star_glat: float,
+    df_glon: float | np.ndarray,
+    df_glat: float | np.ndarray,
+) -> np.ndarray:
     """
-    Calculates the angles between a star's location and other points in galactic coordinates.
+    Calculates the angle between a star's location and other points in galactic coordinates, returning
+    the results in degrees.
 
-    Args:
+    Parameters:
     ----
     star_glon (float): Galactic Longitude of the Star.
     star_glat (float): Galactic Latitude of the Star.
     df_glon (float | np.ndarray): Galactic Longitude(s) of points around the Star.
     df_glat (float | np.ndarray): Galactic Latitude(s) of points around the Star.
+
+    Returns:
+    ----
+    angles (np.ndarray): Array of angles between the coordinates of the Star and each of the points around the Star.
     """
     x0 = np.cos(np.radians(star_glat)) * np.cos(np.radians(star_glon))
     y0 = np.cos(np.radians(star_glat)) * np.sin(np.radians(star_glon))
@@ -28,27 +41,47 @@ def compute_angle_between_star_and_point(star_glon, star_glat, df_glon, df_glat)
     return angles
 
 
-def convert_coordinates_for_stars(path_to_flux_data, path_to_ir_data_dir):
+def convert_coordinates_for_stars(
+    flux_data: pd.DataFrame,
+    path_to_data_files: str,
+    filename_template: str = "{hip_id}_ir_100.csv",
+) -> list[pd.DataFrame]:
     """
-    Converts the coordinates for a specific star and saves the results.
+    Converts the coordinates for stars based on provided star data and updates their corresponding data files with computed angles.
+
+    Parameters:
+    ----
+    flux_data (DataFrame): DataFrame containing at least 'hip_id', 'gaia_l', and 'gaia_b' for each star.
+    path_to_data_files (str): Base directory where star files are stored.
+    filename_template (str): Template for filenames, expects 'hip_id' to format correctly.
     """
-    flux_data = pd.read_csv(path_to_flux_data)
-    stars = flux_data.loc[:, "Star"]
-    for star in stars:
-        print(f"Star: {star}")
-        filename = os.path.join(path_to_ir_data_dir, f"{star}_ir_100.csv")
-        df = pd.read_csv(filename)
-        star_glon = flux_data[flux_data["hip_id"] == star]["gaia_l"].values
-        star_glat = flux_data[flux_data["hip_id"] == star]["gaia_b"].values
+    if not {"hip_id", "gaia_l", "gaia_b"}.issubset(flux_data.columns):
+        logger.error("Required Columns are missing from star data")
+        return []
 
-        glon = df["GL"].values
-        glat = df["GB"].values
-
-        df["Angle"] = compute_angle_between_star_and_point(
-            star_glon, star_glat, glon, glat
+    results = []
+    for _, row in flux_data.iterrows():
+        filename = os.path.join(
+            path_to_data_files, filename_template.format(hip_id=row["hip_id"])
         )
+        try:
+            df = pd.read_csv(filename)
+            glon = df["GL"].values
+            glat = df["GB"].values
 
-    return df
+            star_glon = row["gaia_l"]
+            star_glat = row["gaia_b"]
+
+            df["Angle"] = compute_angle_between_star_and_point(
+                star_glon, star_glat, glon, glat
+            )
+            df.to_csv(filename, index=False)
+            results.append(df)
+        except Exception as e:
+
+            logger.error(f"Failed to process: {e}")
+
+    return results
 
 
 if __name__ == "__main__":
@@ -56,9 +89,9 @@ if __name__ == "__main__":
 
     load_dotenv()
     DATA = os.environ.get("DATA")
-    ir_data_dir = os.path.join(DATA, "raw", "ir_data", "extracted_data")
-    processed_data_dir = os.path.join(DATA, "processed")
-    flux_data_path = os.path.join(processed_data_dir, "flux_data.csv")
-    m8_star_data_path = os.path.join(
-        processed_data_dir, "m8_stellar_data_gaia_hipparcos_with_computed_distance.csv"
-    )
+
+    path_to_data_files = os.path.join(DATA, "extracted_ir_data")
+    flux_data_path = os.path.join(DATA, "m8_hipparcos_data_with_distance.csv")
+    flux_data = pd.read_csv(flux_data_path)
+
+    results = convert_coordinates_for_stars(flux_data, path_to_data_files)

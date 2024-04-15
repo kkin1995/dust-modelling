@@ -385,8 +385,9 @@ if __name__ == "__main__":
     DATA = os.environ.get("DATA")
 
     stars = [88469, 88496, 88506, 88380, 88581, 88560, 88256, 88142, 88705, 88463]
+    # stars = [88469]
 
-    params = [0.3, 0.8]
+    params = [0.3, 0.6]
 
     path_to_stellar_model_flux = os.path.join(DATA, "flux_data_m8.csv")
     path_to_astrodust_model = os.path.join(DATA, "astrodust+PAH_MW_RV3.1.fits")
@@ -402,8 +403,12 @@ if __name__ == "__main__":
 
     options = {"disp": True, "maxiter": 1000}
 
+    ir_emission_model_results = []
+
     for star in stars:
+        data = {}
         print(f"Star: {star}")
+        data["Star"] = star
         modeler = IREmissionModeler(
             star,
             params,
@@ -417,14 +422,21 @@ if __name__ == "__main__":
 
         modeler.optimize("Nelder-Mead", options=options)
         result = modeler.result
-        modeler.plot_results(
-            result.x,
-            save_filename=os.path.join(
-                DATA,
-                "model_observed_ir_plots",
-                f"{star}_model_observed_ir_emission.png",
-            ),
-        )
+        data["CHISQ"] = result.fun
+        data["a"] = result.x[0]
+        data["g"] = result.x[1]
+        # modeler.plot_results(
+        #     result.x,
+        #     save_filename=os.path.join(
+        #         DATA,
+        #         "model_observed_ir_plots",
+        #         f"{star}_model_observed_ir_emission.png",
+        #     ),
+        # )
+        ir_emission_model_results.append(data)
 
-        print(f"Optimized a = {result.x[0]}")
-        print(f"Optimized g = {result.x[1]}")
+        # print(f"Optimized a = {result.x[0]}")
+        # print(f"Optimized g = {result.x[1]}")
+
+    df = pd.DataFrame(ir_emission_model_results)
+    df.to_csv(os.path.join(DATA, "ir_emission_model_results.csv"))

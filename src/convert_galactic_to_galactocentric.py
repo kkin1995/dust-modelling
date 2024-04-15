@@ -1,44 +1,65 @@
 import astropy.units as u
 import astropy.coordinates as coord
 import pandas as pd
+from utils import setup_logger
+
+logger = setup_logger(__name__)
 
 
-def convert_to_galactocentric(df):
+def convert_to_galactocentric(galactic_coords: pd.DataFrame) -> pd.DataFrame:
     """
     Converts Galactic coordinates to Galactocentric coordinates.
 
-    Args:
+    Parameters:
     ----
-    df (pd.DataFrame): DataFrame containing stellar data with columns "hip_id", "Distance(pc)", "gaia_l", and "gaia_b".
+    galactic_coords (pd.DataFrame): DataFrame containing stellar data with columns "Distance(pc)", "gaia_l", and "gaia_b".
 
     Returns:
     ----
-    pd.DataFrame: DataFrame with Galactocentric coordinates x, y, and z added.
+    galactic_coords (pd.DataFrame): DataFrame with Galactocentric coordinates x, y, and z added.
     """
 
-    distance_pc = df["Distance(pc)"].values
-    gl = df["gaia_l"].values
-    gb = df["gaia_b"].values
+    required_columns = ["Distance(pc)", "gaia_l", "gaia_b"]
+    if not all(column in galactic_coords.columns for column in required_columns):
+        logger.error(ValueError("DataFrame is missing one or more required columns."))
+        raise ValueError("DataFrame is missing one or more required columns.")
 
-    c = coord.SkyCoord(
-        l=gl * u.deg, b=gb * u.deg, distance=distance_pc * u.pc, frame="galactic"
-    )
+    try:
+        distance_pc = galactic_coords["Distance(pc)"].values
+        gl = galactic_coords["gaia_l"].values
+        gb = galactic_coords["gaia_b"].values
+    except KeyError as e:
+        logger.error(KeyError(f"Missing Column in DataFrame: {e}"))
+        raise KeyError(f"Missing Column in DataFrame: {e}")
+    except ValueError as e:
+        logger.error(ValueError(f"Data Conversion Error: {e}"))
+        raise ValueError(f"Data Conversion Error: {e}")
 
-    c_galactocentric = c.transform_to(coord.Galactocentric)
+    try:
+        c = coord.SkyCoord(
+            l=gl * u.deg, b=gb * u.deg, distance=distance_pc * u.pc, frame="galactic"
+        )
 
-    df["x_galactocentric"] = c_galactocentric.x.value
-    df["y_galactocentric"] = c_galactocentric.y.value
-    df["z_galactocentric"] = c_galactocentric.z.value
+        c_galactocentric = c.transform_to(coord.Galactocentric)
+    except Exception as e:
+        logger.error(f"Error from Astropy: {e}")
+        raise e
 
-    return df
+    galactic_coords["x_galactocentric"] = c_galactocentric.x.value
+    galactic_coords["y_galactocentric"] = c_galactocentric.y.value
+    galactic_coords["z_galactocentric"] = c_galactocentric.z.value
+
+    return galactic_coords
 
 
 if __name__ == "__main__":
-    m8_data_path = "/Users/karankinariwala/Dropbox/KARAN/1-College/MSc/4th-Semester/Dissertation-Project/flux-from-castelli-kurucz-spectra/data/"
+    from dotenv import load_dotenv
+    import os
 
-    df = pd.read_csv(
-        m8_data_path + "m8_stellar_data_gaia_hipparcos_with_computed_distance.csv"
-    )
+    load_dotenv()
+    DATA = os.environ.get("DATA")
+
+    df = pd.read_csv(os.path.join(DATA, "m8_hipparcos_data_with_distance.csv"))
 
     df_with_galactocentric = convert_to_galactocentric(df)
 

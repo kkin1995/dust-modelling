@@ -6,23 +6,27 @@ import os
 load_dotenv()
 
 DATA = os.environ.get("DATA")
-PLOTS = os.environ.get("PLOTS")
 
-flux_data = os.path.join(DATA, "processed", "flux_data.csv")
+flux_data = os.path.join(DATA, "flux_data_m8.csv")
 star_ids = pd.read_csv(flux_data).loc[:, "Star"].values
 
-binned_uv_data = os.path.join(DATA, "derived")
+binned_uv_data = os.path.join(
+    DATA, "extracted_data_hlsp_files/csv/fov_6_degrees/binned_nuv_data"
+)
+binned_ir_data = os.path.join(
+    DATA, "extracted_data_hlsp_files/csv/fov_6_degrees/binned_ir_data"
+)
 
 for star in star_ids:
     print(f"Star: {star}")
-    filename = os.path.join(binned_uv_data, f"{star}_binned_nuv.csv")
+    filename = os.path.join(binned_ir_data, f"{star}_binned_ir.csv")
     df = pd.read_csv(filename)
     angles = df.loc[:, "Angle"]
-    nuv = df.loc[:, "NUV"]
+    ir = df.loc[:, "IR100"]
 
-    plt.scatter(angles, nuv, s=5, c="red")
+    plt.scatter(angles, ir, s=5, c="red")
     plt.xlabel("Angles (Degrees)")
-    plt.ylabel("NUV (photons cm-2 s-1 A-1 sr-1)")
-    plt.title(f"HIP {star}")
+    plt.ylabel("IR Emission (MJy sr-1)")
+    plt.title(f"HIP {star} - Binned IR Emission")
     plt.grid(True)
-    plt.savefig(os.path.join(PLOTS, f"{star}_binned_nuv.png"))
+    plt.savefig(os.path.join(DATA, "plots", f"{star}_binned_ir.png"))

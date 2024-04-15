@@ -1,14 +1,18 @@
-# Dust Modelling
+# Dust Modelling Toolkit
 
-This package is a work-in-progress toolkit designed for astrophysics and astronomy research, with a focus on the interactions between starlight and dust. The package is modular, allowing researchers to utilize individual components as needed. Key features include:
+This package is an evolving toolkit designed for astrophysicsresearch, focusing on the interactions between stellar light and dust particles in space. The toolkit is built with modularity in mind, allowing researchers to utilize individual components as needed to fit their specific research goals.
 
-## Stellar Flux Modelling: 
-Utilizes the Castelli-Kurucz stellar model to extract and analyze stellar flux measurements.
+## Features
 
-## Dust Interaction Modelling: 
+### Stellar Flux Modelling
+- **Model Integration**: Leverages the Castelli-Kurucz stellar models to analyze and interpret stellar flux measurements effectively.
+- **Data Analysis**: Provides tools for extracting and processing stellar data to study its impact on dust.
 
-Integrates models such as the Draine Infrared Emission Model and the Astrodust Models (Hensley and Draine 2022) to study the interaction of starlight with interstellar or circumstellar dust, and the resulting infrared radiation emitted by the dust.
+### Dust Interaction Modelling
+- **Advanced Modelling**: Incorporates comprehensive models such as the Draine Infrared Emission Model and the Astrodust Models by Hensley and Draine (2022).
+- **Interaction Analysis**: Simulates and analyzes the interaction between stellar light and interstellar/circumstellar dust, focusing on the resulting infrared emissions.
+- **Parameter Optimization**: Includes functionality to perform chi-square tests over a grid of model parameters, facilitating the precise fitting of models to observational data.
 
-## Data IO & Visualization: 
-
-Offers tools for interfacing with various data formats and visualizing the modeled interactions and emissions.
+### Data I/O and Visualization
+- **Data Handling**: Supports various data formats, providing robust tools for data import and export tailored to the needs of astrophysical research.
+- **Visualization Tools**: Offers advanced visualization options to graphically represent data and modelling results, enhancing the interpretability and presentation of research findings.
