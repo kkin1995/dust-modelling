@@ -15,7 +15,7 @@ class FitAstrodustModelToStellarFlux:
     A class used to fit stellar flux as a function of angular distance to the radiation field from the
     Astrodust Models (Hensley and Draine 2022).
 
-    Attributes
+    Parameters
     ----------
     path_to_stellar_model_flux : str
         Path to the file containing stellar model flux data. Must have a column "Star" containing Star ID's from a catalog.

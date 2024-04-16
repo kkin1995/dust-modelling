@@ -12,13 +12,13 @@ def get_col_density_from_dustmap(dustmap: str, gal_coord: tuple) -> float:
     Parameters:
     ----
 
-    dustmap: str. Specifies the dustmap to use to query for the E(B-V). Currently, supports only "SFD".
+    dustmap (str): Specifies the dustmap to use to query for the E(B-V). Currently, supports only "SFD".
     gal_coord: tuple. The coordinates in the galactic system for which to obtain the column density. (l, b)
 
     Returns:
     ----
 
-    col_density: float. The column density of the dust along the line of sight given by gal_coord.
+    col_density (float): The column density of the dust along the line of sight given by gal_coord.
     """
     l0, b0 = gal_coord
     coords = SkyCoord(l0, b0, unit=u.deg, frame="galactic")

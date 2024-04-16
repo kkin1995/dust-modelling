@@ -56,19 +56,20 @@ class ChiSquareGrid:
         plt.close()
 
 
-star_id = 88581
+if __name__ == "__main__":
+    star_id = 88581
 
-path_to_stellar_model_flux = os.path.join(DATA, "processed", "flux_data.csv")
-path_to_astrodust_model = os.path.join(
-    DATA, "raw", "ir_data", "astrodust+PAH_MW_RV3.1.fits"
-)
-path_to_dust_density_file = os.path.join(
-    DATA, "processed", "green-dust-density-2000pc.txt"
-)
-path_to_ir_data_dir = os.path.join(DATA, "raw", "ir_data", "extracted_data")
-path_to_binned_ir_data_dir = os.path.join(DATA, "derived")
+    path_to_stellar_model_flux = os.path.join(DATA, "processed", "flux_data.csv")
+    path_to_astrodust_model = os.path.join(
+        DATA, "raw", "ir_data", "astrodust+PAH_MW_RV3.1.fits"
+    )
+    path_to_dust_density_file = os.path.join(
+        DATA, "processed", "green-dust-density-2000pc.txt"
+    )
+    path_to_ir_data_dir = os.path.join(DATA, "raw", "ir_data", "extracted_data")
+    path_to_binned_ir_data_dir = os.path.join(DATA, "derived")
 
-path_to_col_density_file = os.path.join(DATA, "processed", "m8_col_density.yaml")
+    path_to_col_density_file = os.path.join(DATA, "processed", "m8_col_density.yaml")
 
-chi_square_grid_instance = ChiSquareGrid(star_id)
-A, G, chi_sq_grid = chi_square_grid_instance.compute_chi_square_grid()
+    chi_square_grid_instance = ChiSquareGrid(star_id)
+    A, G, chi_sq_grid = chi_square_grid_instance.compute_chi_square_grid()

@@ -1,135 +1,221 @@
 from astropy.io import fits
 import numpy as np
 import pandas as pd
+import scipy
 from scipy import interpolate
 from scipy.optimize import minimize
 import yaml
 import os
+from src.utils import setup_logger
+
+
+class DataLoader:
+    def __init__(self, config):
+        """
+        Initializes the DataLoader with configuration for file paths.
+
+        Parameters:
+        ----
+        config (dict): A dictionary containing file paths and other necessary configurations.
+        """
+        self.config = config
+        self.logger = setup_logger(__name__)
+
+    def load_column_density(self) -> float:
+        """
+        Loads column density data from a YAML file.
+
+        Returns:
+        ----
+        column_density (float): The column density value.
+        """
+        try:
+            with open(self.config["path_to_col_density_file"]) as f:
+                col_density_data = yaml.safe_load(f)
+            column_density = col_density_data["N(HI + H2)"]
+            return column_density
+        except Exception as e:
+            self.logger.error(
+                FileNotFoundError(f"Failed to load column density data: {e}")
+            )
+
+    def load_astrodust_model(self) -> tuple[float, interpolate.RectBivariateSpline]:
+        """
+        Loads astrodust model data from a FITS file and creates a spline interpolation model.
+
+        Returns:
+        ----
+        ir_wave_near_100_microns, emission_spline (tuple): Contains the wavelength in microns near 100 microns, and the spline model.
+        """
+        try:
+            hdul = fits.open(self.config["path_to_astrodust_model"])
+            ir_wavelength = hdul[6].data
+            ir_wave_near_100_microns = ir_wavelength[
+                np.argmin(np.abs(ir_wavelength - 100))
+            ]
+
+            emission = hdul[7].data
+            log10_u = hdul[5].data
+            hdul.close()
+
+            # Using instructions from Hensley and Draine 2022 (https://github.com/brandonshensley/Astrodust/blob/main/notebooks/model_file_tutorial.ipynb)
+            emission_spline = interpolate.RectBivariateSpline(
+                log10_u, ir_wavelength, emission[:, :, 2]
+            )
+            return ir_wave_near_100_microns, emission_spline
+        except Exception as e:
+            self.logger.error(
+                FileNotFoundError(f"Failed to load astrodust model data: {e}")
+            )
+
+    def load_star_flux_and_distance(self, star_id: int) -> tuple[float, float]:
+        """
+        Loads stellar flux and distance for a given star from a CSV file.
+
+        Parameters:
+        ----
+        star_id : int
+            The identifier of the star.
+
+        Returns:
+        ----
+        dstar, sflux (tuple): The distance to the star and the flux at 1100 A.
+        """
+        try:
+            flux_data = pd.read_csv(self.config["path_to_stellar_model_flux"])
+
+            dstar = flux_data.loc[
+                flux_data.loc[:, "Star"] == star_id, "Distance(pc)"
+            ].values[0]
+            sflux = (
+                flux_data.filter(regex=("Flux.*"))
+                .loc[flux_data.loc[:, "Star"] == star_id, "Flux1100"]
+                .values[0]
+            )
+            return dstar, sflux
+        except FileNotFoundError as e:
+            self.logger.error(
+                FileNotFoundError(f"Failed to load star flux and distance data: {e}")
+            )
+        except pd.errors.EmptyDataError as e:
+            self.logger.error(f"Data loading issue: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error: {e}")
+
+    def load_observed_ir_data(self, star_id: int) -> pd.DataFrame:
+        """
+        Loads observed IR data for a given star from a CSV file.
+
+        Parameters:
+        ----
+        star_id : int
+            The identifier of the star.
+
+        Returns:
+        ----
+        ir_obs_binned_data (pd.DataFrame): A DataFrame containing observed IR data.
+        """
+        try:
+            path = os.path.join(
+                self.config["path_to_binned_ir_data_dir"],
+                f"{star_id}_binned_ir.csv",
+            )
+            ir_obs_binned_data = pd.read_csv(path)
+            return ir_obs_binned_data
+        except Exception as e:
+            self.logger.error(
+                FileNotFoundError(f"Failed to load observed IR data: {e}")
+            )
+
+    def load_dust_density_data(self) -> np.ndarray:
+        """
+        Loads dust density data from a text file.
+
+        Returns:
+        ----
+        dust_density (np.ndarray): An array containing distance and dust density data.
+        """
+        try:
+            dust_density = np.loadtxt(self.config["path_to_dust_density_file"])
+            return dust_density
+        except Exception as e:
+            self.logger.error(
+                FileNotFoundError(f"Failed to load dust density data: {e}")
+            )
 
 
 class IREmissionModeler:
     """
-    A class to model and optimize infrared (IR) emission from interstellar dust for a given star.
+    Models and optimizes infrared (IR) emission from interstellar dust around a specific star, using astrophysical data.
+
+    This class handles the loading of necessary astronomical data, performs simulations of light scattering off dust particles, and optimizes parameters to fit the observed IR emissions data.
 
     Attributes:
-    ----
         star_id (int): The HIPPARCOS identifier for the star being modeled.
-        params (list[float]): Initial guess for the optimization parameters (albedo and phase factor).
-        path_to_stellar_model_flux (str): Path to the CSV file containing stellar model flux data.
-        path_to_astrodust_model (str): Path to the FITS file containing astrodust model data.
-        path_to_dust_density_file (str): Path to the file containing dust density data.
-        path_to_ir_data_dir (str): Path to the directory containing IR data.
-        path_to_binned_ir_data_dir (str): Path to the directory containing binned IR data. Filename must in format "88469_binned_ir_100.csv"
-        path_to_col_density_file (str): Path to the file containing column density data.
+        params (list[float]): Initial guess for the optimization parameters [albedo, phase factor].
+        config (dict): Configuration containing paths to data files.
 
-    Methods:
-    ----
-        load_data: Loads necessary data from files and initializes constants.
-        single_scatter: Simulates single scattering of light off dust particles.
-        calculate_model_irem: Calculates model IR emission based on provided flux.
-        fit: Fits the model to observed data using Chi Square minimization.
-        optimize: Runs the optimization process to find the best fit parameters.
-        plot_results: Generates a plot comparing the modeled IR emission to the observed data.
-        callback: A callback function to provide intermediate outputs during optimization.
+    Constants:
+        SPEED_OF_LIGHT (float): Speed of light in meters per second, used in calculations involving light travel.
+        SPEED_OF_LIGHT_ANGSTROMS (float): Speed of light converted to Angstroms per second.
+        SCALE_FACTOR_RADIATION_FIELD (float): Scaling factor for radiation field intensity based on Mathis et al., 1983.
+
+    Usage:
+        config = {'path_to_data': 'path/to/datafiles'}
+        modeler = IREmissionModeler(star_id=12345, initial_params=[0.5, 0.1], config=config)
+        modeler.optimize(optimizer='Nelder-Mead')
     """
 
-    def __init__(
-        self,
-        star_id: int,
-        initial_params: list[float],
-        path_to_stellar_model_flux: str,
-        path_to_astrodust_model: str,
-        path_to_dust_density_file: str,
-        path_to_ir_data_dir: str,
-        path_to_binned_ir_data_dir: str,
-        path_to_col_density_file: str,
-    ):
+    SPEED_OF_LIGHT = 3e8  # m/s
+    SPEED_OF_LIGHT_ANGSTROMS = SPEED_OF_LIGHT * 1e10
+    SCALE_FACTOR_RADIATION_FIELD = (
+        3.48e-2 * 1e-4
+    )  # ergs cm-2 s-1 A-1 # Mathis et al 1983
+
+    def __init__(self, star_id: int, initial_params: list[float], config: dict):
         self.star_id = star_id
         self.params = initial_params
+        self.config = config
 
-        self.path_to_stellar_model_flux = path_to_stellar_model_flux
-        self.path_to_astrodust_model = path_to_astrodust_model
-        self.path_to_dust_density_file = path_to_dust_density_file
-        self.path_to_ir_data_dir = path_to_ir_data_dir
-        self.path_to_binned_ir_data_dir = path_to_binned_ir_data_dir
-        self.path_to_col_density_file = path_to_col_density_file
-
-        # Defining Constants
-        self.speed_of_light = 3e8
-        self.speed_of_light_angstroms = self.speed_of_light * 1e10
-        self.scale_factor_radiation_field = (
-            3.48e-2 * 1e-4
-        )  # ergs cm-2 s-1 A-1 # Mathis et al 1983
-
+        self.logger = setup_logger(__name__)
+        self.data_loader = DataLoader(self.config)
         self.load_data()
 
     def load_data(self):
         """
-        Loads the observational and model data required for the IR emission calculations.
-        This includes column density, astrodust model data, and stellar flux data.
+        Loads all necessary observational and model data required for IR emission calculations from configured sources.
+
+        This method sets up the model with appropriate astronomical data, including stellar fluxes, dust densities, and other relevant properties from various files specified in the `config` dictionary.
+
+        Raises:
+            RuntimeError: If any data files are missing or corrupt, or if data loading otherwise fails.
         """
-        # Loading the column density in the M8 sightline from file
-        self._load_column_density()
+        try:
+            # Loading the column density in the M8 sightline from file
+            self.column_density = self.data_loader.load_column_density()
 
-        # Loading arrays from the Astrodust Model
-        self._load_astrodust_model()
-
-        # Loading HIP ID values of Stars in M8
-        self._load_star_flux_and_distance()
-
-        # Loading Observed IR Data
-        self._load_observed_ir_data()
-
-        # Loading Dust Density Data
-        self._load_dust_density_data()
-
-    def _load_column_density(self):
-        with open(self.path_to_col_density_file) as f:
-            col_density_data = yaml.load(f, Loader=yaml.FullLoader)
-
-        self.column_density = col_density_data["N(HI + H2)"]
-
-    def _load_astrodust_model(self):
-        hdul = fits.open(self.path_to_astrodust_model)
-        ir_wavelength = hdul[6].data
-        self.ir_wave_near_100_microns = ir_wavelength[
-            np.argmin(np.abs(ir_wavelength - 100))
-        ]
-        self.ir_wave_near_100_microns_angstroms = self.ir_wave_near_100_microns * 1e4
-        emission = hdul[7].data
-        log10_u = hdul[5].data
-        hdul.close()
-
-        # Using instructions from Hensley and Draine 2022 (https://github.com/brandonshensley/Astrodust/blob/main/notebooks/model_file_tutorial.ipynb)
-        self.emission_spline = interpolate.RectBivariateSpline(
-            log10_u, ir_wavelength, emission[:, :, 2]
-        )
-
-    def _load_star_flux_and_distance(self):
-        flux_data = pd.read_csv(self.path_to_stellar_model_flux)
-
-        self.dstar = flux_data.loc[
-            flux_data.loc[:, "Star"] == self.star_id, "Distance(pc)"
-        ].values[0]
-        self.sflux = (
-            flux_data.filter(regex=("Flux.*"))
-            .loc[flux_data.loc[:, "Star"] == self.star_id, "Flux1100"]
-            .values[0]
-        )
-
-    def _load_observed_ir_data(self):
-        self.ir_obs_binned_data = pd.read_csv(
-            os.path.join(
-                self.path_to_binned_ir_data_dir, f"{self.star_id}_binned_ir.csv"
+            # Loading arrays from the Astrodust Model
+            self.ir_wave_near_100_microns, self.emission_spline = (
+                self.data_loader.load_astrodust_model()
             )
-        )
 
-        self.ir_obs_angles = self.ir_obs_binned_data.loc[:, "Angle"]
-        self.observed_ir100 = self.ir_obs_binned_data.loc[:, "IR100"]
+            # Loading HIP ID values of Stars in M8
+            self.dstar, self.sflux = self.data_loader.load_star_flux_and_distance(
+                self.star_id
+            )
 
-    def _load_dust_density_data(self):
-        self.dust_density = np.loadtxt(self.path_to_dust_density_file)
-        self.dust = self.dust_density.transpose()[1]
+            # Loading Observed IR Data
+            self.ir_obs_binned_data = self.data_loader.load_observed_ir_data(
+                self.star_id
+            )
+            self.ir_obs_angles = self.ir_obs_binned_data.loc[:, "Angle"]
+            self.observed_ir100 = self.ir_obs_binned_data.loc[:, "IR100"]
+
+            # Loading Dust Density Data
+            self.dust_density = self.data_loader.load_dust_density_data()
+            self.dust = self.dust_density.transpose()[1]
+        except Exception as e:
+            self.logger.error(RuntimeError(f"Data loading error: {e}"))
 
     def single_scatter(
         self,
@@ -141,34 +227,26 @@ class IREmissionModeler:
         albedo: float,
         phase: float,
         angle: float,
-    ) -> float:
+    ) -> np.ndarray:
         """
-        Perform a single scattering simulation. This simulates the scattering of light from
-        a star off of a dust particle and calculates the flux as a result of this event.
+        Simulates the single scattering of light from a star off interstellar dust particles and calculates the resulting flux.
 
         Parameters:
         ----
-        dust : list or np.ndarray
-            The dust density values along the line of sight. Units: atoms cm-3
-        dsun : np.ndarray
-            The distances from the sun for each dust density value. Units: pc
-        dstar : float
-            The distance to the star. Units: pc
-        sflux : float
-            The stellar flux value. Units: ergs cm-2 s-1 A-1
-        sigma : float
-            The cross-section value at the given wavelength. Units: cm2 / H
-        albedo : float
-            The albedo, or scattering coefficient, of the particles.
-        phase : float
-            The phase function, which describes the directional distribution of scattered light.
-        angle : float
-            The scattering angle. Units: Degrees
+        dust (np.ndarray): Dust density values along the line of sight, in atoms cm-3.
+        dsun (np.ndarray): Distances from the sun for each dust density value, in parsecs.
+        dstar (float): Distance to the star, in parsecs.
+        sflux (float): Stellar flux value, in ergs cm-2 s-1 A-1.
+        sigma (float): Cross-section value at the given wavelength, in cm2/H.
+        albedo (float): Albedo or scattering coefficient of the particles.
+        phase (float): Phase function describing the directional distribution of scattered light.
+        angle (float): Angle between star's coordinates and observation point's coordinates.
 
         Returns:
-        ----
-        float
-            The calculated flux resulting from the scattering events.
+        flux (np.ndarray): The calculated flux values resulting from the scattering event, in the same units as the input flux.
+
+        Raises:
+            ValueError: If any inputs are out of expected range.
         """
         radeg = 57.2958
         delta_dist = dsun[1] - dsun[0]
@@ -207,8 +285,9 @@ class IREmissionModeler:
         ----
         float: The calculated model infrared emission.
         """
+        self.ir_wave_near_100_microns_angstroms = self.ir_wave_near_100_microns * 1e4
         irem = self.emission_spline.ev(
-            np.log10(flux / self.scale_factor_radiation_field),
+            np.log10(flux / IREmissionModeler.SCALE_FACTOR_RADIATION_FIELD),
             self.ir_wave_near_100_microns,
         )  # ergs s-1 sr-1 H-1
         irem = (irem * self.column_density) / (
@@ -216,7 +295,7 @@ class IREmissionModeler:
         )  # I_\lambda # ergs cm-2 s-1 A-1 sr-1
         irem *= (
             (self.ir_wave_near_100_microns_angstroms) ** 2
-        ) / self.speed_of_light_angstroms  # I_\nu # ergs cm-2 s-1 Hz-1 sr -1
+        ) / IREmissionModeler.SPEED_OF_LIGHT_ANGSTROMS  # I_\nu # ergs cm-2 s-1 Hz-1 sr -1
         irem *= 1e23  # Jy sr-1
         irem *= 1e-6  # MJy sr-1
 
@@ -236,6 +315,13 @@ class IREmissionModeler:
         ----
         float: The resulting chi-square value from the fit.
         """
+        if len(params) != 2:
+            self.logger.error(
+                ValueError(
+                    "Expected two parameters for fitting: albedo and phase factor."
+                )
+            )
+
         chisq = 0.0
         a, g = params
 
@@ -244,34 +330,48 @@ class IREmissionModeler:
         sigma = 1.840  # Extinction Cross Section at 1100 A from Draine
         sigma *= 1e-21
 
-        self.model_irem = []
-        for _, angle in enumerate(self.ir_obs_angles):
-            f = np.sum(
-                self.single_scatter(self.dust, dsun, dstar, sflux, sigma, a, g, angle)
+        try:
+            self.model_irem = []
+            for _, angle in enumerate(self.ir_obs_angles):
+                f = np.sum(
+                    self.single_scatter(
+                        self.dust, dsun, dstar, sflux, sigma, a, g, angle
+                    )
+                )
+                if f > 0.0:
+                    irem = self._calculate_model_irem(f)
+                    self.model_irem.append(irem)
+
+            if not self.model_irem:
+                return 1e10
+
+            chisq = np.sum(
+                ((self.observed_ir100 - self.model_irem) ** 2) / self.model_irem
             )
-            if f > 0.0:
-                irem = self._calculate_model_irem(f)
-                self.model_irem.append(irem)
-
-        if not self.model_irem:
-            return 1e10
-
-        chisq = np.sum(((self.observed_ir100 - self.model_irem) ** 2) / self.model_irem)
-        chisq /= len(self.observed_ir100)
+            chisq /= len(self.observed_ir100)
+        except Exception as e:
+            self.logger.error(f"Error during model fitting: {e}")
 
         return chisq
 
-    def optimize(self, optimizer, options={"disp": True, "maxiter": 100}):
+    def optimize(
+        self, optimizer: str, options: dict = {"disp": True, "maxiter": 100}
+    ) -> scipy.optimize.OptimizeResult:
         """
-        Runs the optimization process to determine the best model parameters.
+        Runs the optimization process to find the best fit parameters for the model using the specified optimization algorithm.
 
         Parameters:
         ----
-        optimizer (str): The optimization algorithm to use.
+        optimizer (str): Name of the optimization algorithm to use.
+        options (dict, optional): Dictionary of options specific to the optimizer.
 
-        Returns:
+        Updates:
         ----
-        OptimizeResult: The result of the optimization process.
+        self.result (scipy.optimize.OptimizeResult): Stores the result of the optimization process, typically including the best-fit parameters and the value of the objective function.
+
+        Raises:
+        ----
+        ValueError: If the optimizer is not supported or if the optimization fails.
         """
         self.result = minimize(
             self.fit,
@@ -389,17 +489,20 @@ if __name__ == "__main__":
 
     params = [0.3, 0.6]
 
-    path_to_stellar_model_flux = os.path.join(DATA, "flux_data_m8.csv")
-    path_to_astrodust_model = os.path.join(DATA, "astrodust+PAH_MW_RV3.1.fits")
-    path_to_dust_density_file = os.path.join(DATA, "green-dust-density-2000pc.txt")
-    path_to_ir_data_dir = os.path.join(
-        DATA, "extracted_data_hlsp_files/csv/fov_6_degrees/with_angle"
-    )
-    path_to_binned_ir_data_dir = os.path.join(
-        DATA, "extracted_data_hlsp_files/csv/fov_6_degrees/binned_ir_data"
-    )
-
-    path_to_col_density_file = os.path.join(DATA, "m8_col_density.yaml")
+    config = {
+        "path_to_stellar_model_flux": os.path.join(DATA, "flux_data_m8.csv"),
+        "path_to_astrodust_model": os.path.join(DATA, "green-dust-density-2000pc.txt"),
+        "path_to_dust_density_file": os.path.join(
+            DATA, "green-dust-density-2000pc.txt"
+        ),
+        "path_to_ir_data_dir": os.path.join(
+            DATA, "extracted_data_hlsp_files/csv/fov_6_degrees/with_angle"
+        ),
+        "path_to_binned_ir_data_dir": os.path.join(
+            DATA, "extracted_data_hlsp_files/csv/fov_6_degrees/binned_ir_data"
+        ),
+        "path_to_col_density_file": os.path.join(DATA, "m8_col_density.yaml"),
+    }
 
     options = {"disp": True, "maxiter": 1000}
 
@@ -409,16 +512,7 @@ if __name__ == "__main__":
         data = {}
         print(f"Star: {star}")
         data["Star"] = star
-        modeler = IREmissionModeler(
-            star,
-            params,
-            path_to_stellar_model_flux,
-            path_to_astrodust_model,
-            path_to_dust_density_file,
-            path_to_ir_data_dir,
-            path_to_binned_ir_data_dir,
-            path_to_col_density_file,
-        )
+        modeler = IREmissionModeler(star, params, config)
 
         modeler.optimize("Nelder-Mead", options=options)
         result = modeler.result
