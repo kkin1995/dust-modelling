@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "dust-modeling"
+name = "dust_modeling"
 version = "0.1.0"
 description = ""
 authors = ["kkin1995"]
@@ -15,8 +15,15 @@ python-dotenv = "^1.0.0"
 scipy = "^1.11.4"
 pyyaml = "^6.0.1"
 dustmaps = "^1.0.12"
-
+sphinx = "^7.2.6"
+sphinx-rtd-theme = "^2.0.0"
+setuptools = "^69.5.1"
+wheel = "^0.43.0"
+pytest = "^8.1.1"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.packages]]
+include = "src"

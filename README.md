@@ -1,6 +1,6 @@
 # Dust Modelling Toolkit
 
-This package is an evolving toolkit designed for astrophysicsresearch, focusing on the interactions between stellar light and dust particles in space. The toolkit is built with modularity in mind, allowing researchers to utilize individual components as needed to fit their specific research goals.
+This package is an evolving toolkit designed for astrophysics research, focusing on the interactions between stellar light and dust particles in space. The toolkit is built with modularity in mind, allowing researchers to utilize individual components as needed to fit their specific research goals.
 
 ## Features
 
