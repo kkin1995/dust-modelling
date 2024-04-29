@@ -40,12 +40,30 @@ def get_col_density_from_dustmap(dustmap: str, gal_coord: tuple) -> float:
 if __name__ == "__main__":
     import os
     from dotenv import load_dotenv
+    import pandas as pd
 
     load_dotenv()
     DATA = os.environ.get("DATA")
-    gal_coord = (5.9717, -1.1760)
+    m8_star_data = pd.read_csv(
+        os.path.join(DATA, "m8_hipparcos_data_with_distance.csv")
+    )
+    col_density_list = []
+    for idx, row in m8_star_data.iterrows():
+        col_density_dict = {}
 
-    col_density = get_col_density_from_dustmap("SFD", gal_coord)
+        star_id = row["hip_id"]
+        star_gl = row["gaia_l"]
+        star_gb = row["gaia_b"]
+        star_distance = row["Distance(pc)"]
+        gal_coord = (star_gl, star_gb)
 
-    with open(os.path.join(DATA, "m8_col_density.yaml"), "w") as f:
-        f.write(f"N(HI + H2): {col_density}")
+        print(f"Obtaining Column Density For {star_id}")
+
+        col_density = get_col_density_from_dustmap("SFD", gal_coord)
+
+        col_density_dict["Star"] = star_id
+        col_density_dict["col_density"] = col_density
+        col_density_list.append(col_density_dict)
+
+    df = pd.DataFrame(col_density_list)
+    df.to_csv(os.path.join(DATA, "column_density_along_sightlines.csv"), index=False)

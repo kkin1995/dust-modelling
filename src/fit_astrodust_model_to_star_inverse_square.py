@@ -37,14 +37,14 @@ class FitAstrodustModelToStellarFlux:
 
     def __init__(
         self,
-        path_to_stellar_model_flux,
-        path_to_angle_flux_data_dir,
-        path_to_astrodust_model,
-        path_to_save_results,
-        column_density,
-        scale_factor_radiation_field,
-        speed_of_light=3e8,
-        verbose=False,
+        path_to_stellar_model_flux: str,
+        path_to_angle_flux_data_dir: str,
+        path_to_astrodust_model: str,
+        path_to_save_results: str,
+        column_density: float,
+        scale_factor_radiation_field: float,
+        speed_of_light: float = 3e8,
+        verbose: bool = False,
     ):
         self.path_to_stellar_model_flux = path_to_stellar_model_flux
         self.path_to_angle_flux_data_dir = path_to_angle_flux_data_dir

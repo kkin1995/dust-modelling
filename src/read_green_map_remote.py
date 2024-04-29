@@ -5,6 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dustmaps.config import config
 import os
+from utils import setup_logger
+
+logger = setup_logger(__name__)
 
 config.reset()
 
@@ -27,7 +30,7 @@ def query_green_dust_map(
     max_distance (float): The maximum distance in parsecs.
     plot (bool, optional): Whether to plot the data. Defaults to False.
     save (bool, optional): Whether to save the data to a file. Defaults to True.
-    output_path (string, optional): The path to the output image or data file.
+    output_path (string, optional): The path to the output data file.
 
     Returns:
     ----
@@ -54,7 +57,8 @@ def query_green_dust_map(
         plt.savefig(os.path.join(output_path, "m8_bayestar2019_dust.jpg"))
 
     if save:
-        f = open(os.path.join(output_path, "green-dust-ebv-2000pc.txt"), "w")
+        f = open(output_path, "w")
+        f.write("Distance(pc)" + " " + "Dust(EBV)" + "\n")
         for i in range(len(d)):
             f.write(str(round(d[i], 4)) + " " + str(round(reddening[i], 4)) + "\n")
 
@@ -64,7 +68,29 @@ def query_green_dust_map(
 if __name__ == "__main__":
     import os
     from dotenv import load_dotenv
+    import pandas as pd
 
     load_dotenv()
     DATA = os.environ.get("DATA")
-    query_green_dust_map(5.9575, -1.1667, 2000, output_path=DATA)
+
+    m8_star_data = pd.read_csv(
+        os.path.join(DATA, "m8_hipparcos_data_with_distance.csv")
+    )
+    output_data_path = os.path.join(DATA, "dust_data_green_2019/")
+    if not os.path.exists(output_data_path):
+        os.makedirs(output_data_path)
+
+    for idx, row in m8_star_data.iterrows():
+        star_id = row["hip_id"]
+        star_gl = row["gaia_l"]
+        star_gb = row["gaia_b"]
+        star_distance = row["Distance(pc)"]
+        logger.info(
+            f"Querying Dust Map for {star_id} at coordinates ({star_gl}, {star_gb})"
+        )
+        query_green_dust_map(
+            star_gl,
+            star_gb,
+            star_distance,
+            output_path=os.path.join(output_data_path, f"{star_id}.csv"),
+        )

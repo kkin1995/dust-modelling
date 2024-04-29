@@ -6,7 +6,7 @@ logger = setup_logger(__name__)
 
 
 def save_density_to_file(
-    save_path: str, distance: np.ndarray, total_number_density_hydrogen: np.ndarray
+    path_to_dust_density_ebv_data: str, total_number_density_hydrogen: np.ndarray
 ):
     """
     Saves the calculated hydrogen number density to a specified file.
@@ -14,12 +14,26 @@ def save_density_to_file(
     Parameters:
     ----
     save_path (str): File path where the density data will be saved.
-    distance (np.ndarray): Array of distances corresponding to the density measurements.
     total_number_density_hydrogen (np.ndarray): Array of hydrogen number densities.
     """
-    with open(save_path, "w") as f:
-        for d, density in zip(distance, total_number_density_hydrogen):
-            f.write(f"{d} {density}\n")
+    with open(path_to_dust_density_ebv_data, "r") as file:
+        headers = file.readline().strip()  # Read the first line as header
+        data = np.loadtxt(file)  # Read the remaining data
+
+    if len(data) != len(total_number_density_hydrogen):
+        raise ValueError(
+            "Mismatch between the number of distances and the number of density values provided."
+        )
+
+    header = headers + " n(HI+HII)(cm^-3)"
+    data = np.column_stack((data, total_number_density_hydrogen))
+    np.savetxt(
+        path_to_dust_density_ebv_data,
+        data,
+        fmt="%0.4f %0.4f %0.4f",
+        header=header,
+        comments="",
+    )
 
 
 def plot_density(distance: np.ndarray, total_number_density_hydrogen: np.ndarray):
@@ -38,10 +52,7 @@ def plot_density(distance: np.ndarray, total_number_density_hydrogen: np.ndarray
     plt.show()
 
 
-def convert_ebv_to_density(
-    path_to_dust_density_ebv_data: str,
-    save_path: str = None,
-):
+def convert_ebv_to_density(path_to_dust_density_ebv_data: str, plot: bool = False):
     """
     Converts E(B-V) values to hydrogen number density using the Bohlin, Savage, and Drake 1978 factor.
 
@@ -57,15 +68,9 @@ def convert_ebv_to_density(
 
     try:
         # Importing the downloaded dust data
-        data = np.loadtxt(path_to_dust_density_ebv_data)
+        data = np.loadtxt(path_to_dust_density_ebv_data, skiprows=2)
         distance = data[:, 0]  # Distance in pc
         dust_ebv = data[:, 1]  # Dust in units of E(B-V) (mags)
-
-        # Excluding the first element. First element is 0 mags for 0 pc.
-        # Will cause a divide by zero error
-        if distance[0] == 0:
-            distance = distance[1:]
-            dust_ebv = dust_ebv[1:]
 
         distance_in_cm = distance * pc_in_cm  # convert to cm
 
@@ -75,10 +80,15 @@ def convert_ebv_to_density(
             dust_ebv_per_cm * total_hydrogen_column_density_ebv_ratio
         )
 
-        if save_path == None:
+        total_number_density_hydrogen = np.insert(total_number_density_hydrogen, 0, 0)
+        distance = np.insert(distance, 0, 0)
+
+        if plot:
             plot_density(distance, total_number_density_hydrogen)
         else:
-            save_density_to_file(save_path, distance, total_number_density_hydrogen)
+            save_density_to_file(
+                path_to_dust_density_ebv_data, total_number_density_hydrogen
+            )
     except Exception as e:
         logger.error(f"An Error Occured: {e}")
 
@@ -86,8 +96,18 @@ def convert_ebv_to_density(
 if __name__ == "__main__":
     import os
     from dotenv import load_dotenv
+    import pandas as pd
 
     load_dotenv()
     DATA = os.environ.get("DATA")
+    dust_data_path = os.path.join(DATA, "dust_data_green_2019")
+    m8_star_data = pd.read_csv(
+        os.path.join(DATA, "m8_hipparcos_data_with_distance.csv")
+    )
+    for idx, row in m8_star_data.iterrows():
+        star_id = row["hip_id"]
+        logger.info(f"Converting E(B-V) to n(HI) for {star_id}")
+        star_id = row["hip_id"]
+        dust_data_file = os.path.join(dust_data_path, f"{star_id}.csv")
 
-    convert_ebv_to_density(os.path.join(DATA, "green-dust-ebv-2000pc.txt"))
+        convert_ebv_to_density(dust_data_file)

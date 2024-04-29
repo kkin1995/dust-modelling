@@ -7,19 +7,18 @@ from dotenv import load_dotenv
 load_dotenv()
 DATA = os.environ.get("DATA")
 
-flux_data = pd.read_csv(os.path.join(DATA, "processed", "flux_data.csv"))
+flux_data = pd.read_csv(os.path.join(DATA, "flux_data_m8.csv"))
 stars = flux_data.loc[:, "Star"].values
-# star = stars[0]
 star = "88469"
 
 flux = np.load(
-    os.path.join(DATA, "processed", "single_scatter_model", f"{star}.npy")
+    os.path.join(DATA, "single_scatter_model", f"{star}.npy")
 )  # (3, 100, 10, 10)
 
 PLOT_FLUX_VS_ALBEDO = False
 PLOT_FLUX_VS_PHASE = False
-PLOT_FLUX_VS_ANGLE = False
-PLOT_FLUX_VS_ANGLE_FOR_ALBEDO = True
+PLOT_FLUX_VS_ANGLE = True
+PLOT_FLUX_VS_ANGLE_FOR_ALBEDO = False
 PLOT_FLUX_VS_ANGLE_FOR_PHASE = False
 
 wavelength = [1100, 1500, 2300]  # Angstroms
@@ -66,8 +65,8 @@ if PLOT_FLUX_VS_ALBEDO:
 # 1100 Angstroms
 if PLOT_FLUX_VS_ANGLE:
     iwave = 0  # wavelength is 1100 Angstroms
-    ialbedo = 5  # a is 0.1
-    iphase = 5  # g is 0.1
+    ialbedo = 5  # a is 0.5
+    iphase = 5  # g is 0.5
     fig, ax = plt.subplots()
     flux_with_angle = flux[iwave, :, ialbedo, iphase]
     plt.title(
@@ -75,18 +74,19 @@ if PLOT_FLUX_VS_ANGLE:
     )
     plt.xlabel("Angle")
     plt.ylabel("Flux")
+    plt.grid(True)
     plt.plot(angle, flux_with_angle)
     plt.show()
 
 if PLOT_FLUX_VS_ANGLE_FOR_ALBEDO:
     iwave = 0  # wavelength is 1100 Angstroms
-    iphase = 9  # g is 0.9
+    iphase = 3  # g is 0.3
     fig, ax = plt.subplots()
     for ialbedo in range(10):
         flux_with_angle = flux[iwave, :, ialbedo, iphase]
         ax.plot(
-            angle[0:5],
-            flux_with_angle[0:5],
+            angle,
+            flux_with_angle,
             label="a = " + str(round(albedo[ialbedo], 2)),
         )
 
@@ -103,8 +103,8 @@ if PLOT_FLUX_VS_ANGLE_FOR_PHASE:
     for iphase in range(10):
         flux_with_angle = flux[iwave, :, ialbedo, iphase]
         ax.plot(
-            angle[0:5],
-            flux_with_angle[0:5],
+            angle,
+            flux_with_angle,
             label="g = " + str(round(phase[iphase], 2)),
         )
 

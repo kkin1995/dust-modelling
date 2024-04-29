@@ -1,10 +1,9 @@
 from astropy.io import fits
 import numpy as np
 import pandas as pd
-import scipy
+from scipy import optimize
 from scipy import interpolate
 from scipy.optimize import minimize
-import yaml
 import os
 from src.utils import setup_logger
 
@@ -21,23 +20,18 @@ class DataLoader:
         self.config = config
         self.logger = setup_logger(__name__)
 
-    def load_column_density(self) -> float:
+    def load_column_density(self) -> pd.DataFrame:
         """
-        Loads column density data from a YAML file.
+        Loads column density data from a CSV file into a pandas DataFrame.
 
         Returns:
         ----
-        column_density (float): The column density value.
+        column_density (pd.DataFrame): The column density values along sightlines to all stars..
         """
-        try:
-            with open(self.config["path_to_col_density_file"]) as f:
-                col_density_data = yaml.safe_load(f)
-            column_density = col_density_data["N(HI + H2)"]
-            return column_density
-        except Exception as e:
-            self.logger.error(
-                FileNotFoundError(f"Failed to load column density data: {e}")
-            )
+        filepath = self.config["path_to_col_density_file"]
+        if not os.path.isfile(filepath):
+            self.logger.error(FileNotFoundError(f"File {filepath} not found"))
+        return pd.read_csv(filepath)
 
     def load_astrodust_model(self) -> tuple[float, interpolate.RectBivariateSpline]:
         """
@@ -150,17 +144,20 @@ class IREmissionModeler:
 
     This class handles the loading of necessary astronomical data, performs simulations of light scattering off dust particles, and optimizes parameters to fit the observed IR emissions data.
 
-    Attributes:
+    Parameters:
+    ----
         star_id (int): The HIPPARCOS identifier for the star being modeled.
         params (list[float]): Initial guess for the optimization parameters [albedo, phase factor].
         config (dict): Configuration containing paths to data files.
 
     Constants:
+    ----
         SPEED_OF_LIGHT (float): Speed of light in meters per second, used in calculations involving light travel.
         SPEED_OF_LIGHT_ANGSTROMS (float): Speed of light converted to Angstroms per second.
         SCALE_FACTOR_RADIATION_FIELD (float): Scaling factor for radiation field intensity based on Mathis et al., 1983.
 
     Usage:
+    ----
         config = {'path_to_data': 'path/to/datafiles'}
         modeler = IREmissionModeler(star_id=12345, initial_params=[0.5, 0.1], config=config)
         modeler.optimize(optimizer='Nelder-Mead')
@@ -188,11 +185,15 @@ class IREmissionModeler:
         This method sets up the model with appropriate astronomical data, including stellar fluxes, dust densities, and other relevant properties from various files specified in the `config` dictionary.
 
         Raises:
+        ----
             RuntimeError: If any data files are missing or corrupt, or if data loading otherwise fails.
         """
         try:
             # Loading the column density in the M8 sightline from file
             self.column_density = self.data_loader.load_column_density()
+            self.column_density = self.column_density.loc[
+                self.column_density.loc[:, "Star"] == self.star_id, "col_density"
+            ].values[0]
 
             # Loading arrays from the Astrodust Model
             self.ir_wave_near_100_microns, self.emission_spline = (
@@ -216,6 +217,38 @@ class IREmissionModeler:
             self.dust = self.dust_density.transpose()[1]
         except Exception as e:
             self.logger.error(RuntimeError(f"Data loading error: {e}"))
+
+    def _henyey_greenstein(self, albedo: float, phase: float, angle: float):
+        """
+        Compute the Henyey-Greenstein phase function, which describes the distribution
+        of light scattered in a particular direction.
+
+        Parameters:
+        ----
+        albedo : float
+            The albedo of the particles. Ranges between 0 (no reflectivity)
+            and 1 (total reflectivity).
+        phase : float
+            The phase function 'g' value, which describes the directional distribution
+            of scattered light. Ranges from -1 (backscattering) to 1 (forward scattering).
+        angle : float
+            The scattering angle, in radians.
+
+        Returns:
+        ----
+        float
+            The calculated Henyey-Greenstein phase function value.
+        """
+        if not (0 <= albedo <= 1):
+            raise ValueError("Albedo must be between 0 and 1")
+
+        if not (-1 <= phase <= 1):
+            raise ValueError("Phase 'g' must be between -1 and 1")
+
+        numerator = 1 - (phase**2)
+        denominator = (1 + (phase**2) - (2 * phase * np.cos(angle))) ** (3 / 2)
+
+        return (albedo / (4 * np.pi)) * (numerator / denominator)
 
     def single_scatter(
         self,
@@ -248,10 +281,13 @@ class IREmissionModeler:
         Raises:
             ValueError: If any inputs are out of expected range.
         """
-        radeg = 57.2958
+        angle_in_radians = np.deg2rad(angle)
+        cos_angle_in_radians = np.cos(angle_in_radians)
+        sin_angle_in_radians = np.sin(angle_in_radians)
+
         delta_dist = dsun[1] - dsun[0]
-        min_dist = np.sin(angle / radeg) * dstar
-        dist = np.sqrt((dsun - dstar * np.cos(angle / radeg)) ** 2 + min_dist**2)
+        min_dist = sin_angle_in_radians * dstar
+        dist = np.sqrt((dsun - dstar * cos_angle_in_radians) ** 2 + min_dist**2)
         dangle = np.arcsin(min_dist / dist)
         minpos = np.argmin(dist)  # minpos - index of min value of dist
         if minpos > len(dangle):
@@ -259,10 +295,7 @@ class IREmissionModeler:
 
         # Henyey - Greenstein Phase Function
 
-        sca = (albedo / (4 * np.pi)) * (
-            (1 - (phase**2))
-            / (1 + (phase**2) - (2 * phase * np.cos(dangle))) ** (3 / 2)
-        )
+        sca = self._henyey_greenstein(albedo, phase, dangle)
 
         flux = (sflux / (4.0 * np.pi * dist**2)) * sca
 
@@ -271,7 +304,7 @@ class IREmissionModeler:
         for i in range(nflux):
             flux[i] = flux[i] * np.exp(-sigma * np.sum(dust[0:i]) * delta_dist)
 
-        return flux
+        return np.sum(flux)
 
     def _calculate_model_irem(self, flux: float) -> float:
         """
@@ -356,7 +389,7 @@ class IREmissionModeler:
 
     def optimize(
         self, optimizer: str, options: dict = {"disp": True, "maxiter": 100}
-    ) -> scipy.optimize.OptimizeResult:
+    ) -> optimize.OptimizeResult:
         """
         Runs the optimization process to find the best fit parameters for the model using the specified optimization algorithm.
 
@@ -385,17 +418,17 @@ class IREmissionModeler:
 
     def plot_results(
         self,
-        params,
-        figsize=(10, 6),
-        colors=("blue", "orange"),
-        markerstyles=("o", "s"),
-        grid=True,
-        title=None,
-        xlabel="Angle (Deg)",
-        ylabel="IR Emission (MJy sr-1)",
-        legend_loc="best",
-        legend_title=None,
-        save_filename=None,
+        params: list,
+        figsize: tuple[float, float] = (10, 6),
+        colors: tuple[str, str] = ("blue", "orange"),
+        markerstyles: tuple[str, str] = ("o", "s"),
+        grid: bool = True,
+        title: str = None,
+        xlabel: str = "Angle (Deg)",
+        ylabel: str = "IR Emission (MJy sr-1)",
+        legend_loc: str = "best",
+        legend_title: str = None,
+        save_filename: str = None,
     ):
         """
         Generates and displays a plot comparing the modeled IR emission to observed data.
@@ -485,13 +518,12 @@ if __name__ == "__main__":
     DATA = os.environ.get("DATA")
 
     stars = [88469, 88496, 88506, 88380, 88581, 88560, 88256, 88142, 88705, 88463]
-    # stars = [88469]
 
     params = [0.3, 0.6]
 
     config = {
         "path_to_stellar_model_flux": os.path.join(DATA, "flux_data_m8.csv"),
-        "path_to_astrodust_model": os.path.join(DATA, "green-dust-density-2000pc.txt"),
+        "path_to_astrodust_model": os.path.join(DATA, "astrodust+PAH_MW_RV3.1.fits"),
         "path_to_dust_density_file": os.path.join(
             DATA, "green-dust-density-2000pc.txt"
         ),
@@ -501,7 +533,9 @@ if __name__ == "__main__":
         "path_to_binned_ir_data_dir": os.path.join(
             DATA, "extracted_data_hlsp_files/csv/fov_6_degrees/binned_ir_data"
         ),
-        "path_to_col_density_file": os.path.join(DATA, "m8_col_density.yaml"),
+        "path_to_col_density_file": os.path.join(
+            DATA, "column_density_along_sightlines.csv"
+        ),
     }
 
     options = {"disp": True, "maxiter": 1000}
@@ -519,18 +553,15 @@ if __name__ == "__main__":
         data["CHISQ"] = result.fun
         data["a"] = result.x[0]
         data["g"] = result.x[1]
-        # modeler.plot_results(
-        #     result.x,
-        #     save_filename=os.path.join(
-        #         DATA,
-        #         "model_observed_ir_plots",
-        #         f"{star}_model_observed_ir_emission.png",
-        #     ),
-        # )
+        modeler.plot_results(
+            result.x,
+            save_filename=os.path.join(
+                DATA,
+                "model_observed_ir_plots",
+                f"{star}_model_observed_ir_emission.png",
+            ),
+        )
         ir_emission_model_results.append(data)
-
-        # print(f"Optimized a = {result.x[0]}")
-        # print(f"Optimized g = {result.x[1]}")
 
     df = pd.DataFrame(ir_emission_model_results)
     df.to_csv(os.path.join(DATA, "ir_emission_model_results.csv"))
