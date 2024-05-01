@@ -90,7 +90,7 @@ if __name__ == "__main__":
     load_dotenv()
     DATA = os.environ.get("DATA")
 
-    path_to_data_files = os.path.join(DATA, "extracted_ir_data")
+    path_to_data_files = os.path.join(DATA, "extracted_data_hlsp_files")
     flux_data_path = os.path.join(DATA, "m8_hipparcos_data_with_distance.csv")
     flux_data = pd.read_csv(flux_data_path)
 

@@ -75,30 +75,32 @@ if __name__ == "__main__":
     load_dotenv()
     DATA = os.environ.get("DATA")
 
-    data_dir = os.path.join(
-        DATA, "extracted_data_hlsp_files/csv/fov_6_degrees/with_angle/"
-    )
+    data_dir = os.path.join(DATA, "extracted_data_hlsp_files")
 
     flux_data = os.path.join(DATA, "flux_data_m8.csv")
-    star_ids = pd.read_csv(flux_data).loc[:, "Star"].values
-
+    # star_ids = pd.read_csv(flux_data).loc[:, "Star"].values
+    star_ids = [88469]
     bin_size = 0.03
+    uv_or_ir = "uv"
+    fuv_or_nuv = "nuv"
 
     for star_id in star_ids:
-        filename = os.path.join(data_dir, f"{star_id}.csv")
+        filename = os.path.join(data_dir, f"hip_{str(star_id)}_fov_10_{uv_or_ir}.csv")
         logger.info(f"Binning Data For {star_id}")
 
         binned_angles, binned_flux = bin_data(
-            filename, bin_size, "Angle", "NUV", "uv", "nuv"
+            filename, bin_size, "Angle", f"{fuv_or_nuv}_final", uv_or_ir, fuv_or_nuv
         )
 
-        df = pd.DataFrame(data={"Angle": binned_angles, "NUV": binned_flux})
+        df = pd.DataFrame(
+            data={"Angle": binned_angles, fuv_or_nuv.upper(): binned_flux}
+        )
         df.to_csv(
             os.path.join(
                 DATA,
                 os.path.join(
-                    "extracted_data_hlsp_files/csv/fov_6_degrees/binned_nuv_data",
-                    f"{star_id}_binned_nuv.csv",
+                    "extracted_data_hlsp_files/",
+                    f"hip_{star_id}_fov_10_{uv_or_ir}_{fuv_or_nuv}_binned_{bin_size}.csv",
                 ),
             )
         )
