@@ -44,7 +44,8 @@ def compute_angle_between_star_and_point(
 def convert_coordinates_for_stars(
     flux_data: pd.DataFrame,
     path_to_data_files: str,
-    filename_template: str = "{hip_id}_ir_100.csv",
+    uv_or_ir: str,
+    filename_template: str,
 ) -> list[pd.DataFrame]:
     """
     Converts the coordinates for stars based on provided star data and updates their corresponding data files with computed angles.
@@ -62,12 +63,13 @@ def convert_coordinates_for_stars(
     results = []
     for _, row in flux_data.iterrows():
         filename = os.path.join(
-            path_to_data_files, filename_template.format(hip_id=row["hip_id"])
+            path_to_data_files,
+            filename_template.format(hip_id=row["hip_id"], uv_or_ir=uv_or_ir),
         )
         try:
             df = pd.read_csv(filename)
-            glon = df["GL"].values
-            glat = df["GB"].values
+            glon = df["glon"].values
+            glat = df["glat"].values
 
             star_glon = row["gaia_l"]
             star_glat = row["gaia_b"]
@@ -89,9 +91,11 @@ if __name__ == "__main__":
 
     load_dotenv()
     DATA = os.environ.get("DATA")
-
+    uv_or_ir = "ir"
     path_to_data_files = os.path.join(DATA, "extracted_data_hlsp_files")
     flux_data_path = os.path.join(DATA, "m8_hipparcos_data_with_distance.csv")
     flux_data = pd.read_csv(flux_data_path)
 
-    results = convert_coordinates_for_stars(flux_data, path_to_data_files)
+    results = convert_coordinates_for_stars(
+        flux_data, path_to_data_files, uv_or_ir, "hip_{hip_id}_fov_10_{uv_or_ir}.csv"
+    )

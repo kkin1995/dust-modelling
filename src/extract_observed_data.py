@@ -38,16 +38,19 @@ if __name__ == "__main__":
     load_dotenv()
 
     DATA = os.environ.get("DATA")
-    hlsp_data_path = os.path.join(
-        DATA, "extracted_data_hlsp_files", "hip_88469_fov_10.csv"
-    )
+    star_id = 88469
     uv_or_ir = "uv"
+    hlsp_data_path = os.path.join(
+        DATA, "extracted_data_hlsp_files", f"hip_{str(star_id)}_fov_10.csv"
+    )
     df = pd.read_csv(hlsp_data_path)
-    df = extract_and_preprocess_observed_data(df, "uv")
+    df = extract_and_preprocess_observed_data(df, uv_or_ir)
 
     df.to_csv(
         os.path.join(
-            DATA, "extracted_data_hlsp_files", f"hip_88469_fov_10_{uv_or_ir}.csv"
+            DATA,
+            "extracted_data_hlsp_files",
+            f"hip_{str(star_id)}_fov_10_{uv_or_ir}.csv",
         ),
         index=False,
     )

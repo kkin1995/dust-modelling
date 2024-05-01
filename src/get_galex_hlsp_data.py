@@ -371,7 +371,7 @@ if __name__ == "__main__":
 
     load_dotenv()
     DATA = os.environ.get("DATA")
-    star_id = 88469
+    star_id = 88496
     galex_hlsp_dir = os.path.join(DATA, "galex_hlsp_files/")
     m8_star_data_df = pd.read_csv(
         os.path.join(DATA, "m8_hipparcos_data_with_distance.csv")
@@ -381,7 +381,7 @@ if __name__ == "__main__":
     gb = star_data["gaia_b"].values[0]
     fov = 10
 
-    out, out_sum = get_galex_hlsp_data(gl, gb, fov, data_dir=galex_hlsp_dir)
+    out, out_sum = get_galex_hlsp_data(gl, gb, fov, galex_hlsp_dir, verbose=True)
     data_dicts = [asdict(instance) for instance in out]
     df = pd.DataFrame(data_dicts)
     df.to_csv(
